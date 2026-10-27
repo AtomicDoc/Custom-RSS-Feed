@@ -6,7 +6,7 @@ show:
   author: "AtomicDoc"
   # Public base URL where the `public/` folder is served (your Cloudflare Tunnel hostname, e.g. https://podcast.yourdomain.com).
   # Podcast apps need absolute URLs, so set this before subscribing.
-  base_url: "http://localhost:8080"
+  base_url: "https://podcast.atmc.lol"
   target_minutes: 20          # rough episode length
   max_stories: 10             # cap per episode (new + follow-ups)
   interests: >
