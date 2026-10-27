@@ -38,8 +38,8 @@ tts:
   # Chatterbox uses its built-in voice, or clones any clean 10-20s WAV you point it at
   # (use your own recording or one you have rights to, e.g. a public-domain LibriVox reader).
   chatterbox_voice: ""
-  chatterbox_exaggeration: 0.5   # 0.35 calm, 0.5 natural, 0.7 lively
-  chatterbox_cfg_weight: 0.5     # lower (~0.3) = slower, more deliberate pacing
+  chatterbox_exaggeration: 0.7   # "lively" (picked from voice tests); 0.35 calm, 0.5 natural
+  chatterbox_cfg_weight: 0.3     # lower (~0.3) = slower, more deliberate pacing
   kokoro_voice: "af_heart"    # female: af_heart (best), af_bella, af_nicole, bf_emma (British)
   kokoro_speed: 1.0
   piper_model: ""             # path to a .onnx voice if engine = piper
