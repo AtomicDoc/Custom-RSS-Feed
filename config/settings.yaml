@@ -10,8 +10,8 @@ show:
   target_minutes: 20          # rough episode length
   max_stories: 10             # cap per episode (new + follow-ups)
   interests: >
-    Technology, AI, science, world news, US politics, economy, gaming, Esports, Deadlock.
-    Skip celebrity gossip and sports scores.
+    Technology, AI, science, world news, US politics, economy, gaming, Esports (League of Legends), Deadlock.
+    Skip celebrity gossip and traditional sports scores; esports results are welcome.
 
 ollama:
   url: "http://localhost:11434"
