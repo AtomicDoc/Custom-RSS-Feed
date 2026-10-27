@@ -1,16 +1,16 @@
 show:
-  title: "Morning Brief"
-  host_name: "Max"            # name the AI host uses for itself
-  listener_name: ""           # optional: "Good morning, <name>"
+  title: "The Half-Life Morning Show"
+  host_name: "Adam"            # name the AI host uses for itself
+  listener_name: "Atomic"           # optional: "Good morning, <name>"
   description: "A personal daily news briefing, compiled locally."
   author: "AtomicDoc"
   # Public base URL where the `public/` folder is served (Cloudflare Tunnel / Tailscale Funnel).
   # Podcast apps need absolute URLs, so set this before subscribing.
   base_url: "http://localhost:8080"
-  target_minutes: 12          # rough episode length
+  target_minutes: 20          # rough episode length
   max_stories: 10             # cap per episode (new + follow-ups)
   interests: >
-    Technology, AI, science, world news, US politics, economy.
+    Technology, AI, science, world news, US politics, economy, gaming, Esports, Deadlock.
     Skip celebrity gossip and sports scores.
 
 ollama:
