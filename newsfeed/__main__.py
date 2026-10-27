@@ -1,12 +1,13 @@
 """CLI entry point: python -m newsfeed {fetch|run|feeds}"""
 import argparse
 import logging
+import sys
 import tempfile
 from datetime import date
 from pathlib import Path
 
 from . import audio, config, db, feeds, fetch, memory, planner, script
-from .llm import Ollama
+from .llm import Ollama, OllamaError
 
 log = logging.getLogger("newsfeed")
 
@@ -79,7 +80,13 @@ def main():
     cfg = config.load()
     conn = db.connect(cfg["paths"]["data_dir"])
     llm = Ollama(cfg["ollama"])
-    {"fetch": cmd_fetch, "run": cmd_run, "feeds": cmd_feeds}[args.command](conn, cfg, llm, args)
+    try:
+        if args.command != "feeds":
+            llm.check()
+        {"fetch": cmd_fetch, "run": cmd_run, "feeds": cmd_feeds}[args.command](conn, cfg, llm, args)
+    except OllamaError as exc:
+        log.error("%s", exc)
+        sys.exit(1)
 
 
 if __name__ == "__main__":
