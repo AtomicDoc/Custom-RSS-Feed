@@ -1,0 +1,9 @@
+feedparser>=6.0
+feedgen>=1.0
+requests>=2.31
+PyYAML>=6.0
+numpy>=1.26
+soundfile>=0.12
+kokoro>=0.9.4
+# Optional alternative TTS engine (set tts.engine: piper)
+# piper-tts>=1.2

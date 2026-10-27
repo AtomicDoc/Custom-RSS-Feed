@@ -1,0 +1,18 @@
+# News sources. Add/remove freely — any RSS or Atom URL works.
+# `weight` (optional, default 1.0) nudges how much a source counts when ranking stories.
+feeds:
+  - name: BBC World
+    url: https://feeds.bbci.co.uk/news/world/rss.xml
+  - name: NPR News
+    url: https://feeds.npr.org/1001/rss.xml
+  - name: Reuters (via Google News)
+    url: https://news.google.com/rss/search?q=site:reuters.com&hl=en-US&gl=US&ceid=US:en
+  - name: AP (via Google News)
+    url: https://news.google.com/rss/search?q=site:apnews.com&hl=en-US&gl=US&ceid=US:en
+  - name: Ars Technica
+    url: https://feeds.arstechnica.com/arstechnica/index
+  - name: The Verge
+    url: https://www.theverge.com/rss/index.xml
+  - name: Hacker News (front page)
+    url: https://hnrss.org/frontpage
+    weight: 0.7

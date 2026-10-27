@@ -1,0 +1,43 @@
+show:
+  title: "Morning Brief"
+  host_name: "Max"            # name the AI host uses for itself
+  listener_name: ""           # optional: "Good morning, <name>"
+  description: "A personal daily news briefing, compiled locally."
+  author: "AtomicDoc"
+  # Public base URL where the `public/` folder is served (Cloudflare Tunnel / Tailscale Funnel).
+  # Podcast apps need absolute URLs, so set this before subscribing.
+  base_url: "http://localhost:8080"
+  target_minutes: 12          # rough episode length
+  max_stories: 10             # cap per episode (new + follow-ups)
+  interests: >
+    Technology, AI, science, world news, US politics, economy.
+    Skip celebrity gossip and sports scores.
+
+ollama:
+  url: "http://localhost:11434"
+  # Fits entirely in an 8GB RTX 4060 at the default Q4 quantization.
+  # gemma3:12b / qwen3:14b write better but spill partly into system RAM (slower, still fine overnight).
+  chat_model: "llama3.1:8b"
+  embed_model: "nomic-embed-text"
+  num_ctx: 12288              # keeps model + context inside 8GB VRAM
+  temperature: 0.6
+  timeout_seconds: 900
+
+memory:
+  max_article_age_hours: 36   # ignore older items when fetching
+  story_window_days: 14       # how far back to look for "same story" matches
+  same_story_auto: 0.86       # cosine similarity: above this = same story, no LLM check
+  same_story_maybe: 0.72      # between maybe..auto the LLM decides; below = new story
+
+tts:
+  engine: "kokoro"            # kokoro | piper
+  kokoro_voice: "am_michael"  # e.g. af_heart, am_michael, bf_emma
+  kokoro_speed: 1.0
+  piper_model: ""             # path to a .onnx voice if engine = piper
+  intro_audio: ""             # optional mp3/wav played before the episode
+  outro_audio: ""
+
+paths:
+  data_dir: "data"            # SQLite DB lives here
+  public_dir: "public"        # served over HTTP: feeds + episodes
+  keep_episodes: 30
