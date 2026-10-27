@@ -35,12 +35,13 @@ def _candidates(conn, cfg) -> list[dict]:
     cutoff = (datetime.now(timezone.utc) - timedelta(hours=cfg["memory"]["max_article_age_hours"])).isoformat()
     rows = conn.execute(
         """
-        SELECT s.*, COUNT(DISTINCT a.source) AS n_sources, SUM(a.weight) AS score
+        SELECT s.*, COUNT(DISTINCT a.source) AS n_sources, SUM(a.weight) AS score,
+               GROUP_CONCAT(DISTINCT a.source) AS sources
         FROM stories s JOIN articles a ON a.story_id = s.id
         WHERE a.aired = 0 AND a.fetched_at >= ?
         GROUP BY s.id
-        ORDER BY n_sources DESC, score DESC
-        LIMIT 40
+        ORDER BY score DESC, n_sources DESC
+        LIMIT 60
         """,
         (cutoff,),
     ).fetchall()
@@ -59,15 +60,16 @@ def plan_episode(conn, llm: Ollama, cfg: dict) -> list[Item]:
     if not candidates:
         return []
 
+    # Source names give the editor context a bare headline lacks (e.g. a cryptic Steam patch-note title).
     listing = "\n".join(
-        f"[{c['id']}] {c['headline']} ({c['n_sources']} sources"
-        f"{', previously covered' if c['times_aired'] else ''})"
+        f"[{c['id']}] {c['headline']} (from: {c['sources'].replace(',', ', ')}"
+        f"{'; previously covered' if c['times_aired'] else ''})"
         for c in candidates
     )
     picked = llm.chat_json(EDITOR_SYSTEM, f"LISTENER INTERESTS: {show['interests']}\n\nCANDIDATES:\n{listing}")
     by_id = {c["id"]: c for c in candidates}
     order = [int(i) for i in picked.get("story_ids", []) if str(i).isdigit() and int(i) in by_id]
-    # Fall back to source-count ranking if the model returned nothing usable.
+    # Fall back to weighted-score ranking if the model returned nothing usable.
     order = list(dict.fromkeys(order)) or [c["id"] for c in candidates]
 
     items: list[Item] = []
