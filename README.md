@@ -69,15 +69,31 @@ in VRAM, and Kokoro runs on CUDA, so a ~12-minute episode builds in a few minute
 ## Getting the podcast on your phone
 
 Podcast apps such as Overcast, Pocket Casts and Apple Podcasts fetch feeds from their own servers, so the feed needs a
-public HTTPS URL. The easiest free option with a stable URL is **Tailscale Funnel**:
+public HTTPS URL. With your own domain, use a **Cloudflare Tunnel**: free, no port forwarding, and it runs as a
+Windows service so it survives reboots.
 
-1. Install Tailscale (`winget install Tailscale.Tailscale`) and sign in.
-2. `tailscale funnel --bg 8080` (the first time, it gives you a link to enable Funnel for your tailnet).
-3. It prints a URL like `https://my-laptop.tail1234.ts.net`. Put that in `settings.yaml` under `show.base_url`,
-   then run `.\.venv\Scripts\python -m newsfeed feeds` to rewrite the feeds with that URL.
-4. In your podcast app, choose "add by URL" and enter `https://my-laptop.tail1234.ts.net/podcast.xml`.
+1. **Put the domain on Cloudflare** (skip if it already is): add it at dash.cloudflare.com (Free plan) and change
+   the nameservers at your registrar to the two Cloudflare gives you.
+2. **Create the tunnel:** Cloudflare dashboard → *Zero Trust* → *Networks* → *Tunnels* → *Create a tunnel* →
+   *Cloudflared*, name it `morning-brief`.
+3. **Install the connector:** pick *Windows*, then run the command it shows in an Administrator PowerShell
+   (`setup.ps1` has already installed `cloudflared`):
+   ```powershell
+   cloudflared.exe service install <your-token>
+   ```
+4. **Route a hostname:** on the tunnel's *Public Hostname* tab, add subdomain `podcast` on your domain,
+   with service type **HTTP** and URL **`localhost:8080`** (the Caddy server from `register-tasks.ps1`).
+5. **Point the feeds at it:** set `show.base_url: "https://podcast.yourdomain.com"` in `settings.yaml`, then run
+   `.\.venv\Scripts\python -m newsfeed feeds` to rewrite the feeds with that URL.
+6. **Subscribe:** in your podcast app, choose "add by URL" and enter `https://podcast.yourdomain.com/podcast.xml`.
+   The source feed is at `/combined.xml` for your RSS reader.
 
-If you own a domain on Cloudflare, a named **Cloudflare Tunnel** (`cloudflared`) to `localhost:8080` works too.
+Cloudflare gotchas:
+- Don't put **Cloudflare Access** (a login page) in front of this hostname, and keep **Bot Fight Mode** off.
+  Podcast apps fetch feeds from their servers, and both would block them.
+- Cloudflare caches `.mp3` files. If you rebuild an episode with `run --force`, purge the cache for that URL
+  (*Caching* → *Purge Cache* → *Custom Purge*), or the app will keep the old audio.
+
 The feed sets `itunes:block`, so it won't be listed in public podcast directories, but anyone who has the URL
 can open it.
 

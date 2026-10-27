@@ -4,7 +4,7 @@ show:
   listener_name: "Atomic"           # optional: "Good morning, <name>"
   description: "A personal daily news briefing, compiled locally."
   author: "AtomicDoc"
-  # Public base URL where the `public/` folder is served (Cloudflare Tunnel / Tailscale Funnel).
+  # Public base URL where the `public/` folder is served (your Cloudflare Tunnel hostname, e.g. https://podcast.yourdomain.com).
   # Podcast apps need absolute URLs, so set this before subscribing.
   base_url: "http://localhost:8080"
   target_minutes: 20          # rough episode length

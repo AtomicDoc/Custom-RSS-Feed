@@ -13,6 +13,7 @@ $tools = @{
     "ollama"  = "Ollama.Ollama"
     "ffmpeg"  = "Gyan.FFmpeg"
     "caddy"   = "CaddyServer.Caddy"
+    "cloudflared" = "Cloudflare.cloudflared"   # tunnel that exposes Caddy on your domain
     "py"      = "Python.Python.3.12"   # Kokoro TTS needs Python 3.10-3.12
 }
 foreach ($cmd in $tools.Keys) {
