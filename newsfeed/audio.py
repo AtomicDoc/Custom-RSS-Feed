@@ -153,4 +153,19 @@ def voice_tests(tts_cfg: dict, out_dir: Path) -> list[Path]:
             encode_mp3(wav, mp3)
         made.append(mp3)
         log.info("Wrote %s", mp3.name)
+    _write_voice_index(out_dir, made)
     return made
+
+
+def _write_voice_index(out_dir: Path, files: list[Path]) -> None:
+    """A small listening page, since the web server doesn't list folder contents."""
+    rows = "".join(
+        f'<li><b>{f.stem}</b><br><audio controls preload="none" src="{f.name}"></audio></li>' for f in files
+    )
+    (out_dir / "index.html").write_text(
+        '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+        "<title>Voice tests</title>"
+        "<style>body{font:16px system-ui;margin:16px;max-width:600px}li{margin:14px 0}audio{width:100%}</style>"
+        f"<h1>Voice tests</h1><p>{VOICE_TEST_TEXT}</p><ul>{rows}</ul>",
+        encoding="utf-8",
+    )
