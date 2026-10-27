@@ -27,7 +27,11 @@ CREATE TABLE IF NOT EXISTS stories (
     first_seen   TEXT NOT NULL,
     last_updated TEXT NOT NULL,
     last_aired   TEXT,
-    times_aired  INTEGER DEFAULT 0
+    times_aired  INTEGER DEFAULT 0,
+    -- state before the latest airing, so `run --force` can undo it and rebuild the same episode
+    prev_headline   TEXT,
+    prev_summary    TEXT,
+    prev_last_aired TEXT
 );
 CREATE TABLE IF NOT EXISTS episodes (
     id         INTEGER PRIMARY KEY,
@@ -54,7 +58,21 @@ def connect(data_dir: Path) -> sqlite3.Connection:
     conn = sqlite3.connect(data_dir / "newsfeed.db")
     conn.row_factory = sqlite3.Row
     conn.executescript(SCHEMA)
+    _migrate(conn)
     return conn
+
+
+# Columns added after the first release; CREATE TABLE IF NOT EXISTS won't add them to an existing database.
+ADDED_COLUMNS = {"stories": {"prev_headline": "TEXT", "prev_summary": "TEXT", "prev_last_aired": "TEXT"}}
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    for table, columns in ADDED_COLUMNS.items():
+        existing = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
+        for name, kind in columns.items():
+            if name not in existing:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {kind}")
+    conn.commit()
 
 
 def to_blob(vec: np.ndarray) -> bytes:

@@ -166,9 +166,10 @@ def remember_aired(conn, llm: Ollama, items: list[Item], segments: list[str], to
             f"PREVIOUS MEMORY:\n{item.story['summary'] or '(none — first time covered)'}\n\n"
             f"TODAY'S SEGMENT:\n{segment}"
         ))
+        # SQLite evaluates the right-hand sides against the old row, so prev_* capture the pre-airing state.
         conn.execute(
-            "UPDATE stories SET headline = ?, summary = ?, last_aired = ?, times_aired = times_aired + 1"
-            " WHERE id = ?",
+            "UPDATE stories SET prev_headline = headline, prev_summary = summary, prev_last_aired = last_aired,"
+            " headline = ?, summary = ?, last_aired = ?, times_aired = times_aired + 1 WHERE id = ?",
             (
                 result.get("headline") or item.story["headline"],
                 result.get("summary") or segment[:1200],
@@ -178,3 +179,28 @@ def remember_aired(conn, llm: Ollama, items: list[Item], segments: list[str], to
         )
         conn.executemany("UPDATE articles SET aired = 1 WHERE id = ?", [(a["id"],) for a in item.articles])
     conn.commit()
+
+
+def forget_aired(conn, episode_created_at: str) -> int:
+    """Undoes remember_aired() for the episode built at `episode_created_at`, returning its stories to the pool."""
+    stories = conn.execute("SELECT * FROM stories WHERE last_aired >= ?", (episode_created_at,)).fetchall()
+    for story in stories:
+        # Articles fetched since the story's previous airing are the ones this episode covered.
+        conn.execute(
+            "UPDATE articles SET aired = 0 WHERE story_id = ? AND aired = 1 AND fetched_at >= ?",
+            (story["id"], story["prev_last_aired"] or ""),
+        )
+        first_airing = story["times_aired"] <= 1
+        conn.execute(
+            "UPDATE stories SET headline = ?, summary = ?, last_aired = ?, times_aired = ?,"
+            " prev_headline = NULL, prev_summary = NULL, prev_last_aired = NULL WHERE id = ?",
+            (
+                story["prev_headline"] or story["headline"],
+                None if first_airing else (story["prev_summary"] or story["summary"]),
+                story["prev_last_aired"],
+                max(0, story["times_aired"] - 1),
+                story["id"],
+            ),
+        )
+    conn.commit()
+    return len(stories)

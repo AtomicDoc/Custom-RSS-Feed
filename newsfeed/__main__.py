@@ -3,7 +3,7 @@ import argparse
 import logging
 import sys
 import tempfile
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 from . import audio, config, db, feeds, fetch, memory, planner, script
@@ -21,9 +21,13 @@ def cmd_fetch(conn, cfg, llm, args):
 
 def cmd_run(conn, cfg, llm, args):
     today = date.today()
-    if conn.execute("SELECT 1 FROM episodes WHERE date = ?", (today.isoformat(),)).fetchone() and not args.force:
+    existing = conn.execute("SELECT * FROM episodes WHERE date = ?", (today.isoformat(),)).fetchone()
+    if existing and not args.force:
         log.info("Episode for %s already exists (use --force to rebuild)", today)
         return
+    if existing and not args.script_only:
+        # Put the previous build's stories back so the rebuild covers the same news, not just what's arrived since.
+        log.info("Rebuilding: returned %d stories to the pool", script.forget_aired(conn, existing["created_at"]))
 
     cmd_fetch(conn, cfg, llm, args)
     items = planner.plan_episode(conn, llm, cfg)
@@ -40,7 +44,8 @@ def cmd_run(conn, cfg, llm, args):
 
     episodes_dir = cfg["paths"]["public_dir"] / "episodes"
     episodes_dir.mkdir(parents=True, exist_ok=True)
-    filename = f"{today.isoformat()}.mp3"
+    # Unique per build: a rebuilt episode gets a new URL, so no CDN or podcast app can serve a stale copy.
+    filename = f"{today.isoformat()}-{datetime.now():%H%M%S}.mp3"
     mp3 = episodes_dir / filename
     tts = cfg["tts"]
     llm.unload()   # the LLM and the TTS model don't both fit in 8GB of VRAM
@@ -55,6 +60,8 @@ def cmd_run(conn, cfg, llm, args):
         (today.isoformat(), title, text, script.show_notes(items), filename, mp3.stat().st_size, duration, db.now()),
     )
     conn.commit()
+    if existing:
+        (episodes_dir / existing["filename"]).unlink(missing_ok=True)
     # Only commit stories to memory once the episode actually exists, so a failed run doesn't skip news.
     script.remember_aired(conn, llm, items, segments, today)
     feeds.prune_episodes(conn, cfg)
