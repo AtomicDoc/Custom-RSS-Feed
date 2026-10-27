@@ -4,6 +4,8 @@ requests>=2.31
 PyYAML>=6.0
 numpy>=1.26
 soundfile>=0.12
+# TTS. Install torch==2.6.0 from the CUDA index first (deploy/setup.ps1 does this).
+chatterbox-tts==0.1.7
 kokoro>=0.9.4
 # Optional alternative TTS engine (set tts.engine: piper)
 # piper-tts>=1.2

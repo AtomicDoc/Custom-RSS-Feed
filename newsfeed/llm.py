@@ -24,6 +24,7 @@ class Ollama:
         self.embed_model = cfg["embed_model"]
         self.options = {"num_ctx": cfg.get("num_ctx", 8192), "temperature": cfg.get("temperature", 0.6)}
         self.timeout = cfg.get("timeout_seconds", 900)
+        self.think = cfg.get("think")   # set false for reasoning models (qwen3) to skip slow hidden thinking
 
     def _post(self, path: str, body: dict) -> dict:
         for attempt, delay in enumerate((*RETRY_DELAYS, None), 1):
@@ -58,6 +59,13 @@ class Ollama:
             if name not in installed:
                 raise OllamaError(f"Model {model} isn't pulled yet. Run: ollama pull {model}")
 
+    def unload(self) -> None:
+        """Frees the chat model's VRAM now instead of after Ollama's 5-minute keep-alive, so TTS fits on the GPU."""
+        try:
+            requests.post(f"{self.url}/api/generate", json={"model": self.chat_model, "keep_alive": 0}, timeout=60)
+        except requests.RequestException as exc:
+            log.warning("Couldn't unload %s: %s", self.chat_model, exc)
+
     def embed(self, texts: list[str]) -> list[np.ndarray]:
         data = self._post("/api/embed", {"model": self.embed_model, "input": texts})
         vecs = [np.asarray(v, dtype=np.float32) for v in data["embeddings"]]
@@ -75,6 +83,8 @@ class Ollama:
         }
         if as_json:
             body["format"] = "json"
+        if self.think is not None:
+            body["think"] = self.think
         # Reasoning models (qwen3, deepseek-r1) may emit <think> blocks; never read those aloud.
         return THINK_RE.sub("", self._post("/api/chat", body)["message"]["content"]).strip()
 

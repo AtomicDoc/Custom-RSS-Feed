@@ -30,8 +30,9 @@ if (-not (Test-Path .venv)) {
 }
 $python = Join-Path $root ".venv\Scripts\python.exe"
 & $python -m pip install --upgrade pip
-# CUDA build of PyTorch so Kokoro runs on the RTX 4060 instead of the CPU.
-& $python -m pip install torch --index-url https://download.pytorch.org/whl/cu128
+# CUDA build of PyTorch so TTS runs on the RTX 4060 instead of the CPU. Chatterbox pins torch 2.6.0 exactly;
+# installing that version from the CUDA index first stops pip pulling the CPU-only 2.6.0 from PyPI later.
+& $python -m pip install torch==2.6.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu124
 & $python -m pip install -r requirements.txt
 & $python -c "import torch; print('CUDA available for TTS:', torch.cuda.is_available())"
 

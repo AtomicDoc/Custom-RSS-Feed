@@ -12,16 +12,19 @@ show:
   interests: >
     Technology, AI, science, world news, US politics, economy, gaming, Esports (League of Legends), Deadlock.
     Skip celebrity gossip and traditional sports scores; esports results are welcome.
+  polish_pass: true           # second "read it aloud" editing pass per story: more natural, ~2x writing time
 
 ollama:
   url: "http://localhost:11434"
-  # Fits entirely in an 8GB RTX 4060 at the default Q4 quantization.
-  # gemma3:12b / qwen3:14b write better but spill partly into system RAM (slower, still fine overnight).
-  chat_model: "llama3.1:8b"
+  # gemma3:12b writes the most natural English that runs here; it slightly overflows the 4060's 8GB into
+  # system RAM, which is slower but fine for a 5:30am job. Faster/plainer: llama3.1:8b (fits fully in VRAM).
+  # Also worth trying: qwen3:14b or qwen3:30b-a3b (set `think: false` below for both).
+  chat_model: "gemma3:12b"
   embed_model: "nomic-embed-text"
-  num_ctx: 12288              # keeps model + context inside 8GB VRAM
-  temperature: 0.6
+  num_ctx: 12288
+  temperature: 0.75           # a bit higher = less formulaic phrasing
   timeout_seconds: 900
+  # think: false              # uncomment for qwen3 / other reasoning models
 
 memory:
   max_article_age_hours: 36   # ignore older items when fetching
@@ -30,8 +33,14 @@ memory:
   same_story_maybe: 0.72      # between maybe..auto the LLM decides; below = new story
 
 tts:
-  engine: "kokoro"            # kokoro | piper
-  kokoro_voice: "am_michael"  # e.g. af_heart, am_michael, bf_emma
+  engine: "chatterbox"        # chatterbox (most natural) | kokoro (fast) | piper
+  # Run `python -m newsfeed voices` to hear every option side by side before choosing.
+  # Chatterbox uses its built-in voice, or clones any clean 10-20s WAV you point it at
+  # (use your own recording or one you have rights to, e.g. a public-domain LibriVox reader).
+  chatterbox_voice: ""
+  chatterbox_exaggeration: 0.5   # 0.35 calm, 0.5 natural, 0.7 lively
+  chatterbox_cfg_weight: 0.5     # lower (~0.3) = slower, more deliberate pacing
+  kokoro_voice: "af_heart"    # female: af_heart (best), af_bella, af_nicole, bf_emma (British)
   kokoro_speed: 1.0
   piper_model: ""             # path to a .onnx voice if engine = piper
   intro_audio: ""             # optional mp3/wav played before the episode

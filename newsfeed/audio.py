@@ -1,5 +1,6 @@
 """Local text-to-speech and MP3 encoding."""
 import logging
+import re
 import subprocess
 import sys
 import tempfile
@@ -12,6 +13,50 @@ log = logging.getLogger(__name__)
 
 PARAGRAPH_GAP = 0.35   # seconds of silence between paragraphs
 SEGMENT_GAP = 0.9      # between stories
+CHUNK_GAP = 0.12       # between Chatterbox chunks inside a paragraph
+CHUNK_CHARS = 280      # Chatterbox stops at ~40s of speech per call, so feed it a few sentences at a time
+
+
+def _silence(rate: int, seconds: float) -> np.ndarray:
+    return np.zeros(int(rate * seconds), dtype=np.float32)
+
+
+def _paragraphs(segment: str) -> list[str]:
+    return [p.strip() for p in re.split(r"\n+", segment) if p.strip()]
+
+
+def _chunks(paragraph: str, limit: int = CHUNK_CHARS):
+    chunk = ""
+    for sentence in re.split(r"(?<=[.!?])\s+", paragraph):
+        if chunk and len(chunk) + len(sentence) + 1 > limit:
+            yield chunk
+            chunk = sentence
+        else:
+            chunk = f"{chunk} {sentence}".strip()
+    if chunk:
+        yield chunk
+
+
+def _chatterbox(segments: list[str], cfg: dict) -> tuple[np.ndarray, int]:
+    import torch
+    from chatterbox.tts import ChatterboxTTS  # heavy import (torch); only load when used
+
+    model = ChatterboxTTS.from_pretrained(device="cuda" if torch.cuda.is_available() else "cpu")
+    exaggeration = cfg.get("chatterbox_exaggeration", 0.5)
+    if cfg.get("chatterbox_voice"):
+        model.prepare_conditionals(cfg["chatterbox_voice"], exaggeration=exaggeration)
+    rate = model.sr
+    out = []
+    for segment in segments:
+        for paragraph in _paragraphs(segment):
+            for chunk in _chunks(paragraph):
+                wav = model.generate(
+                    chunk, exaggeration=exaggeration, cfg_weight=cfg.get("chatterbox_cfg_weight", 0.5)
+                )
+                out += [wav.squeeze(0).numpy(), _silence(rate, CHUNK_GAP)]
+            out.append(_silence(rate, PARAGRAPH_GAP))
+        out.append(_silence(rate, SEGMENT_GAP))
+    return np.concatenate(out), rate
 
 
 def _kokoro(segments: list[str], cfg: dict) -> tuple[np.ndarray, int]:
@@ -26,8 +71,8 @@ def _kokoro(segments: list[str], cfg: dict) -> tuple[np.ndarray, int]:
             if audio is None:
                 continue
             out.append(audio.cpu().numpy() if hasattr(audio, "cpu") else np.asarray(audio))
-            out.append(np.zeros(int(rate * PARAGRAPH_GAP), dtype=np.float32))
-        out.append(np.zeros(int(rate * SEGMENT_GAP), dtype=np.float32))
+            out.append(_silence(rate, PARAGRAPH_GAP))
+        out.append(_silence(rate, SEGMENT_GAP))
     return np.concatenate(out), rate
 
 
@@ -41,11 +86,11 @@ def _piper(segments: list[str], cfg: dict) -> tuple[np.ndarray, int]:
                 input=segment.encode("utf-8"), check=True,
             )
             data, rate = sf.read(wav, dtype="float32")
-            out += [data, np.zeros(int(rate * SEGMENT_GAP), dtype=np.float32)]
+            out += [data, _silence(rate, SEGMENT_GAP)]
     return np.concatenate(out), rate
 
 
-ENGINES = {"kokoro": _kokoro, "piper": _piper}
+ENGINES = {"chatterbox": _chatterbox, "kokoro": _kokoro, "piper": _piper}
 
 
 def synthesize(segments: list[str], cfg: dict, wav_path: Path) -> None:
@@ -75,3 +120,37 @@ def encode_mp3(wav_path: Path, mp3_path: Path, intro: str = "", outro: str = "")
         capture_output=True, text=True, check=True,
     )
     return int(float(probe.stdout.strip()))
+
+
+VOICE_TEST_TEXT = (
+    "Good morning! So, the big story today is out of Brussels, where European leaders finally agreed on new "
+    "rules for AI chatbots. It took them almost two years, which, honestly, is pretty fast for the EU.\n"
+    "Here's what actually changes for you: companies now have to tell you when you're talking to a bot, "
+    "and the fines for breaking that rule are steep. We'll see how strictly it's enforced."
+)
+
+VOICE_TESTS = {
+    "chatterbox-calm": {"engine": "chatterbox", "chatterbox_exaggeration": 0.35, "chatterbox_cfg_weight": 0.5},
+    "chatterbox-natural": {"engine": "chatterbox", "chatterbox_exaggeration": 0.5, "chatterbox_cfg_weight": 0.5},
+    "chatterbox-lively": {"engine": "chatterbox", "chatterbox_exaggeration": 0.7, "chatterbox_cfg_weight": 0.3},
+    "kokoro-af_heart": {"engine": "kokoro", "kokoro_voice": "af_heart"},
+    "kokoro-af_bella": {"engine": "kokoro", "kokoro_voice": "af_bella"},
+    "kokoro-af_nicole": {"engine": "kokoro", "kokoro_voice": "af_nicole"},
+    "kokoro-bf_emma": {"engine": "kokoro", "kokoro_voice": "bf_emma"},
+}
+
+
+def voice_tests(tts_cfg: dict, out_dir: Path) -> list[Path]:
+    """Renders the same sample paragraph with each candidate voice so they can be compared by ear."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    made = []
+    for name, overrides in VOICE_TESTS.items():
+        cfg = {**tts_cfg, **overrides}   # Chatterbox tests use your chatterbox_voice clip if one is set
+        with tempfile.TemporaryDirectory() as tmp:
+            wav = Path(tmp) / "test.wav"
+            synthesize(_paragraphs(VOICE_TEST_TEXT), cfg, wav)
+            mp3 = out_dir / f"{name}.mp3"
+            encode_mp3(wav, mp3)
+        made.append(mp3)
+        log.info("Wrote %s", mp3.name)
+    return made

@@ -43,6 +43,7 @@ def cmd_run(conn, cfg, llm, args):
     filename = f"{today.isoformat()}.mp3"
     mp3 = episodes_dir / filename
     tts = cfg["tts"]
+    llm.unload()   # the LLM and the TTS model don't both fit in 8GB of VRAM
     with tempfile.TemporaryDirectory() as tmp:
         wav = Path(tmp) / "speech.wav"
         audio.synthesize(segments, tts, wav)
@@ -66,6 +67,16 @@ def cmd_feeds(conn, cfg, llm, args):
     feeds.write_podcast_feed(conn, cfg)
 
 
+def cmd_voices(conn, cfg, llm, args):
+    llm.unload()
+    out_dir = cfg["paths"]["public_dir"] / "voice-tests"
+    made = audio.voice_tests(cfg["tts"], out_dir)
+    base = cfg["show"]["base_url"].rstrip("/")
+    print("\nListen and compare:")
+    for mp3 in made:
+        print(f"  {base}/voice-tests/{mp3.name}")
+
+
 def main():
     parser = argparse.ArgumentParser(prog="newsfeed", description="Personal RSS + AI morning news podcast")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -74,6 +85,7 @@ def main():
     run.add_argument("--force", action="store_true", help="rebuild even if today's episode exists")
     run.add_argument("--script-only", action="store_true", help="print the script only; no audio, and covered stories stay unaired")
     sub.add_parser("feeds", help="regenerate both feeds from the database")
+    sub.add_parser("voices", help="render a sample paragraph in each candidate voice to public/voice-tests/")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)-7s %(name)s: %(message)s")
@@ -81,9 +93,10 @@ def main():
     conn = db.connect(cfg["paths"]["data_dir"])
     llm = Ollama(cfg["ollama"])
     try:
-        if args.command != "feeds":
+        if args.command in ("fetch", "run"):
             llm.check()
-        {"fetch": cmd_fetch, "run": cmd_run, "feeds": cmd_feeds}[args.command](conn, cfg, llm, args)
+        commands = {"fetch": cmd_fetch, "run": cmd_run, "feeds": cmd_feeds, "voices": cmd_voices}
+        commands[args.command](conn, cfg, llm, args)
     except OllamaError as exc:
         log.error("%s", exc)
         sys.exit(1)

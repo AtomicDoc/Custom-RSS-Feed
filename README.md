@@ -5,7 +5,7 @@ Two feeds, generated entirely on your own machine:
 | Feed | URL | What it is |
 |---|---|---|
 | **Sources** | `<base_url>/combined.xml` | Every article from the sources in `config/feeds.yaml`, merged into one RSS feed. Subscribe in any RSS reader. |
-| **Podcast** | `<base_url>/podcast.xml` | A daily episode written by a local LLM (Ollama) and voiced by local TTS (Kokoro). Subscribe in any podcast app. |
+| **Podcast** | `<base_url>/podcast.xml` | A daily episode written by a local LLM (Ollama) and voiced by local TTS (Chatterbox or Kokoro). Subscribe in any podcast app. |
 
 The podcast has a **story memory**: it won't repeat stories you've already heard. When an old story has
 real new developments, the host gives a short recap and then covers what changed.
@@ -24,7 +24,7 @@ feeds.yaml ─► fetch ─► embed (nomic-embed-text) ─► match to recent s
                                                         ├─ no  → skipped, never repeated
                                                         └─ yes → recap + what changed
                                                         ▼
-           script (one LLM call per segment) ─► Kokoro TTS (GPU) ─► ffmpeg MP3 ─► podcast.xml
+           script (draft + polish per segment) ─► Chatterbox TTS (GPU) ─► ffmpeg MP3 ─► podcast.xml
                                                         │
            after airing, each story's "what the listener knows" summary is updated for tomorrow
 ```
@@ -33,6 +33,9 @@ feeds.yaml ─► fetch ─► embed (nomic-embed-text) ─► match to recent s
 
 Tested target: 32GB RAM, RTX 4060 Laptop (8GB VRAM), i7-13700HX. The default `llama3.1:8b` fits entirely
 in VRAM, and Kokoro runs on CUDA, so a ~12-minute episode builds in a few minutes.
+The defaults now favor quality over speed: `gemma3:12b` (slightly overflows into system RAM) plus
+Chatterbox TTS, so expect roughly 20-40 minutes per 20-minute episode. That's fine for a 5:30am job.
+Ollama's model is unloaded before TTS starts, so the two never compete for the 8GB of VRAM.
 
 1. **Clone the repo**
    ```powershell
@@ -103,8 +106,11 @@ Optional: drop a square `cover.jpg` (1400–3000px) into `public\` for episode a
 
 | Want | Change in `settings.yaml` |
 |---|---|
-| Better writing | `ollama.chat_model: gemma3:12b` or `qwen3:14b` (spills partly into system RAM: slower, but fine at 5am) |
-| Different voice | `tts.kokoro_voice`: `af_heart`, `am_michael`, `bf_emma`, `bm_george`, … |
+| Faster writing | `ollama.chat_model: llama3.1:8b` (fits fully in VRAM; plainer prose), or `show.polish_pass: false` |
+| Different writing model | `qwen3:14b` / `qwen3:30b-a3b`, with `ollama.think: false` |
+| Different voice | run `python -m newsfeed voices` and compare, then set `tts.engine` + voice |
+| A specific voice | `tts.chatterbox_voice: C:\path\to\clip.wav` (10-20s clean speech you have rights to) |
+| Livelier / calmer delivery | `tts.chatterbox_exaggeration` (0.35 calm … 0.7 lively) |
 | Fewer "same story" merges | raise `memory.same_story_auto` / `same_story_maybe` |
 | Catch more follow-ups | lower them, or raise `memory.story_window_days` |
 | Intro music | `tts.intro_audio: C:\path\to\jingle.mp3` |
@@ -116,6 +122,7 @@ python -m newsfeed fetch                 # pull sources, update story memory + c
 python -m newsfeed run [--force]         # fetch + build today's episode + podcast.xml
 python -m newsfeed run --script-only     # preview today's script
 python -m newsfeed feeds                 # regenerate both feeds (e.g. after changing base_url)
+python -m newsfeed voices               # sample every voice -> <base_url>/voice-tests/*.mp3
 ```
 
 ## Layout
